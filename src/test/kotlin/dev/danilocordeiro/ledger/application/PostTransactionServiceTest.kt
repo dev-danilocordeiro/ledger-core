@@ -19,6 +19,7 @@ import dev.danilocordeiro.ledger.domain.DomainError
 import dev.danilocordeiro.ledger.domain.Money
 import dev.danilocordeiro.ledger.domain.NormalSide
 import dev.danilocordeiro.ledger.domain.TransactionId
+import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -83,6 +84,9 @@ class PostTransactionServiceTest {
         every { idempotency.find(any()) } returns null
         every { ledger.lockAndLoadBalances(any()) } returns emptyMap()
         val firstFingerprint = slotFingerprint(command)
+        // The probe above is a real post and records a real ledger/outbox call; clear
+        // that call history so the assertions below only observe the replay itself.
+        clearMocks(ledger, outbox, answers = false)
 
         every { idempotency.find(command.idempotencyKey) } returns IdempotencyRecord(
             key = command.idempotencyKey,
