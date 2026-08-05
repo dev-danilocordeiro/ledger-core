@@ -63,7 +63,9 @@ data class OutboxEvent(
  * org.springframework.transaction. Keeping @Transactional out of the use case is what
  * lets these services be unit-tested with plain MockK and no Spring context.
  */
-fun interface UnitOfWork {
+// Kotlin does not allow SAM conversion for a generic abstract method, so this stays a
+// plain interface; callers use an object expression instead of a lambda.
+interface UnitOfWork {
     fun <T> inTransaction(block: () -> T): T
 }
 

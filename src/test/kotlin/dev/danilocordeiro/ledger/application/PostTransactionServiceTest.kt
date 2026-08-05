@@ -46,7 +46,9 @@ class PostTransactionServiceTest {
         ledger = ledger,
         idempotency = idempotency,
         outbox = outbox,
-        unitOfWork = UnitOfWork { it() },
+        unitOfWork = object : UnitOfWork {
+            override fun <T> inTransaction(block: () -> T): T = block()
+        },
         clock = ClockPort { now },
     )
 

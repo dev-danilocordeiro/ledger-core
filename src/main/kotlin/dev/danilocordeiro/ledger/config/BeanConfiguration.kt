@@ -34,8 +34,9 @@ class BeanConfiguration {
      * without a transaction, which in a ledger means partially applied money movement.
      */
     @Bean
-    fun unitOfWork(template: TransactionTemplate) = UnitOfWork { block ->
-        template.execute { block() } ?: error("transaction returned null")
+    fun unitOfWork(template: TransactionTemplate) = object : UnitOfWork {
+        override fun <T> inTransaction(block: () -> T): T =
+            template.execute { block() } ?: error("transaction returned null")
     }
 
     @Bean
