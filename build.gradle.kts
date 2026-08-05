@@ -10,6 +10,12 @@ plugins {
 group = "dev.danilocordeiro"
 version = "0.1.0-SNAPSHOT"
 
+// Spring Boot's BOM pins org.testcontainers:testcontainers to 1.20.4, whose bundled
+// docker-java defaults to Docker API 1.32 and is rejected by newer daemons (minimum
+// 1.40). Override the BOM property so every org.testcontainers:* module resolves to a
+// version whose docker-java negotiates the daemon's API version correctly.
+extra["testcontainers.version"] = "1.21.3"
+
 java {
     toolchain { languageVersion.set(JavaLanguageVersion.of(21)) }
 }
@@ -40,9 +46,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation(kotlin("test"))
     testImplementation("io.mockk:mockk:1.13.13")
-    testImplementation("org.testcontainers:junit-jupiter:1.20.4")
-    testImplementation("org.testcontainers:postgresql:1.20.4")
-    testImplementation("org.testcontainers:kafka:1.20.4")
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:postgresql")
+    testImplementation("org.testcontainers:kafka")
     testImplementation("org.awaitility:awaitility:4.2.2")
 }
 
