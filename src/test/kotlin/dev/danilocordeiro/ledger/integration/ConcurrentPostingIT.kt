@@ -17,6 +17,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.properties.Delegates
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -29,8 +30,9 @@ class ConcurrentPostingIT : AbstractIntegrationTest() {
     @Autowired private lateinit var useCase: PostTransactionUseCase
     @Autowired private lateinit var jdbc: JdbcClient
 
-    private lateinit var wallet: AccountId
-    private lateinit var merchant: AccountId
+    // AccountId is a value class; lateinit does not support inline value class properties.
+    private var wallet: AccountId by Delegates.notNull()
+    private var merchant: AccountId by Delegates.notNull()
     private val brl = CurrencyCode("BRL")
 
     @BeforeEach
