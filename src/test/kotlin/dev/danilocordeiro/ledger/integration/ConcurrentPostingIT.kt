@@ -166,21 +166,28 @@ class ConcurrentPostingIT : AbstractIntegrationTest() {
 
     private fun fund(account: AccountId, amount: Long) {
         val funding = createAccount(allowsNegative = true)
-        useCase.post(transfer(funding, account, amount, "funding-${UUID.randomUUID()}"))
+        // Tagged with an external reference so countTransactions(), which only counts
+        // transactions under test, does not mistake setup funding for test activity.
+        useCase.post(transfer(funding, account, amount, "funding-${UUID.randomUUID()}", externalReference = "funding"))
     }
 
     private fun debit(amount: Long, key: String) = transfer(wallet, merchant, amount, key)
 
-    private fun transfer(from: AccountId, to: AccountId, amount: Long, key: String) =
-        PostTransactionCommand(
-            idempotencyKey = key,
-            currency = brl,
-            entries = listOf(
-                PostTransactionCommand.EntryCommand(from, Direction.CREDIT, Money.positiveMinorUnits(amount)),
-                PostTransactionCommand.EntryCommand(to, Direction.DEBIT, Money.positiveMinorUnits(amount)),
-            ),
-            externalReference = null,
-        )
+    private fun transfer(
+        from: AccountId,
+        to: AccountId,
+        amount: Long,
+        key: String,
+        externalReference: String? = null,
+    ) = PostTransactionCommand(
+        idempotencyKey = key,
+        currency = brl,
+        entries = listOf(
+            PostTransactionCommand.EntryCommand(from, Direction.CREDIT, Money.positiveMinorUnits(amount)),
+            PostTransactionCommand.EntryCommand(to, Direction.DEBIT, Money.positiveMinorUnits(amount)),
+        ),
+        externalReference = externalReference,
+    )
 
     private fun balanceOf(account: AccountId): Long =
         jdbc.sql("SELECT balance_minor FROM account_balance WHERE account_id = ?")
