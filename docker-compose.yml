@@ -65,7 +65,7 @@ services:
     healthcheck:
       # distroless has no shell and no curl; the JVM's own HTTP client is the only
       # probe available inside the image.
-      test: ["CMD", "java", "-e", "0"]
+      test: ["CMD", "java", "-cp", "/healthcheck", "HealthCheck"]
       interval: 15s
       timeout: 5s
       retries: 5

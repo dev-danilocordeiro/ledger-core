@@ -14,6 +14,8 @@ RUN ./gradlew --no-daemon dependencies || true
 FROM deps AS build
 COPY src ./src
 RUN ./gradlew --no-daemon clean bootJar -x test
+COPY docker/HealthCheck.java ./docker/HealthCheck.java
+RUN javac -d /healthcheck-out docker/HealthCheck.java
 
 # ---- Stage 3: layered extraction ----------------------------------------------
 # Spring's layered jar splits dependencies from application classes, so a code change
@@ -32,6 +34,7 @@ COPY --from=extract /app/extracted/dependencies/ ./
 COPY --from=extract /app/extracted/spring-boot-loader/ ./
 COPY --from=extract /app/extracted/snapshot-dependencies/ ./
 COPY --from=extract /app/extracted/application/ ./
+COPY --from=build /healthcheck-out/HealthCheck.class /healthcheck/HealthCheck.class
 
 USER nonroot:nonroot
 EXPOSE 8080
