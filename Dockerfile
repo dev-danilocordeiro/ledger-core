@@ -20,8 +20,8 @@ RUN ./gradlew --no-daemon clean bootJar -x test
 # only invalidates the last (small) layer at pull time.
 FROM eclipse-temurin:21-jre-alpine AS extract
 WORKDIR /app
-COPY --from=build /build/build/libs/*.jar app.jar
-RUN java -Djarmode=layertools -jar app.jar extract --destination extracted
+COPY --from=build /build/build/libs/*.jar application.jar
+RUN java -Djarmode=tools -jar application.jar extract --layers --destination extracted
 
 # ---- Stage 4: runtime ----------------------------------------------------------
 # distroless: no shell, no package manager, no busybox. Removes an entire class of
@@ -38,4 +38,4 @@ EXPOSE 8080
 
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom"
 
-ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]
+ENTRYPOINT ["java", "-jar", "application.jar"]
