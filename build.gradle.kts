@@ -1,9 +1,9 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    kotlin("jvm") version "2.1.0"
-    kotlin("plugin.spring") version "2.1.0"
-    id("org.springframework.boot") version "3.4.1"
+    kotlin("jvm") version "2.3.21"
+    kotlin("plugin.spring") version "2.3.21"
+    id("org.springframework.boot") version "4.1.0"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -30,12 +30,16 @@ dependencies {
 
     // --- Persistence: plain JdbcClient, no JPA. See ADR-0002. ---
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
-    implementation("org.flywaydb:flyway-core")
+    // Boot 4.1 splits Flyway autoconfiguration into its own starter; flyway-core alone
+    // resolves but FlywayAutoConfiguration never registers, so migrations never run.
+    implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
     // --- Messaging ---
-    implementation("org.springframework.kafka:spring-kafka")
+    // Boot 4.1 splits Kafka autoconfiguration into its own starter; a bare spring-kafka
+    // dependency resolves but never registers a KafkaTemplate bean.
+    implementation("org.springframework.boot:spring-boot-starter-kafka")
 
     // --- Observability ---
     implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -56,7 +60,7 @@ kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_21)
         // Domain invariants rely on non-null contracts being enforced at runtime.
-        freeCompilerArgs.addAll("-Xjsr305=strict")
+        freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
     }
 }
 

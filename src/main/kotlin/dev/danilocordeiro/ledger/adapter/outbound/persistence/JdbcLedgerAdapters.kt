@@ -83,12 +83,13 @@ class JdbcLedgerRepository(private val jdbc: JdbcClient) : LedgerRepository {
             VALUES (?, ?, ?, ?)
             """.trimIndent(),
         )
-            .params(
-                transaction.id.value,
-                transaction.currency.code,
-                transaction.externalReference,
-                Timestamp.from(transaction.occurredAt),
-            )
+            // externalReference is nullable; JdbcClient's params(vararg) requires non-null
+            // elements now that spring-jdbc is JSpecify @NullMarked, so each parameter is
+            // bound individually via the overload that still accepts a @Nullable value.
+            .param(1, transaction.id.value)
+            .param(2, transaction.currency.code)
+            .param(3, transaction.externalReference)
+            .param(4, Timestamp.from(transaction.occurredAt))
             .update()
 
         transaction.entries.forEach { entry ->
