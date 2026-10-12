@@ -113,7 +113,7 @@ class JdbcLedgerRepository(private val jdbc: JdbcClient) : LedgerRepository {
         deltas.entries
             .sortedBy { it.key.value } // same lock order as above
             .forEach { (accountId, delta) ->
-                jdbc.sql(
+                val updated = jdbc.sql(
                     """
                     UPDATE account_balance
                        SET balance_minor = balance_minor + ?,
@@ -124,6 +124,11 @@ class JdbcLedgerRepository(private val jdbc: JdbcClient) : LedgerRepository {
                 )
                     .params(delta, accountId.value)
                     .update()
+                // Entries are already appended; a missing projection row must abort the
+                // whole transaction instead of silently leaving the balance behind.
+                check(updated == 1) {
+                    "balance projection for account ${accountId.value} not updated: $updated rows affected"
+                }
             }
     }
 }

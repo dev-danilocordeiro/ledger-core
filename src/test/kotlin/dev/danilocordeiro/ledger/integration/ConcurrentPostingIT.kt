@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.properties.Delegates
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
@@ -134,6 +135,30 @@ class ConcurrentPostingIT : AbstractIntegrationTest() {
 
         assertEquals(0, failures.get(), "no transfer should fail; a deadlock would surface here")
         assertNoImbalance()
+    }
+
+    @Test
+    fun `posting against an account without a balance row is rejected and rolled back entirely`() {
+        val orphan = createAccount(allowsNegative = true)
+        jdbc.sql("DELETE FROM account_balance WHERE account_id = ?").param(orphan.value).update()
+
+        assertFailsWith<IllegalStateException> { useCase.post(transfer(orphan, merchant, 5_00, "orphan")) }
+
+        assertEquals(0, countTransactions(), "ledger_transaction must be rolled back")
+        val entries = jdbc.sql("SELECT COUNT(*) FROM ledger_entry WHERE account_id IN (?, ?)")
+            .params(orphan.value, merchant.value).query(Long::class.java).single()
+        assertEquals(0L, entries, "ledger_entry rows must be rolled back")
+        assertEquals(0L, balanceOf(merchant))
+    }
+
+    @Test
+    fun `posting against existing balance rows updates balance and version`() {
+        useCase.post(debit(10_00, key = "normal-flow"))
+
+        assertEquals(90_00L, balanceOf(wallet))
+        val version = jdbc.sql("SELECT version FROM account_balance WHERE account_id = ?")
+            .param(wallet.value).query(Long::class.java).single()
+        assertEquals(2L, version, "one bump for the funding, one for the debit")
     }
 
     /** Global integrity: the sum of every signed entry in the ledger must be zero. */
