@@ -183,7 +183,21 @@ private object TransactionPostedPayload {
         return """{"transactionId":"${transaction.id.value}",""" +
             """"currency":"${transaction.currency.code}",""" +
             """"occurredAt":"${transaction.occurredAt}",""" +
-            """"externalReference":${transaction.externalReference?.let { "\"$it\"" } ?: "null"},""" +
+            """"externalReference":${transaction.externalReference?.let(::jsonString) ?: "null"},""" +
             """"entries":[$entries]}"""
+    }
+
+    /** Client-supplied text must be escaped, or it can break or inject into the event JSON. */
+    private fun jsonString(value: String): String = buildString {
+        append('"')
+        value.forEach { c ->
+            when {
+                c == '"' -> append("\\\"")
+                c == '\\' -> append("\\\\")
+                c < ' ' || c == '\u2028' || c == '\u2029' -> append("\\u%04x".format(c.code))
+                else -> append(c)
+            }
+        }
+        append('"')
     }
 }
