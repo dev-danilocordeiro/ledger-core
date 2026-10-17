@@ -2,20 +2,29 @@ package dev.danilocordeiro.ledger.adapter.inbound.web
 
 import dev.danilocordeiro.ledger.domain.DomainError
 import org.slf4j.LoggerFactory
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.HttpStatusCode
 import org.springframework.http.ProblemDetail
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.context.request.WebRequest
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
 import java.net.URI
 
 /**
  * RFC 9457 problem details. A generic 500 for a rejected posting is unactionable for an
  * integrating client; the error type URI lets them branch on the cause programmatically
  * instead of parsing a message string.
+ *
+ * Extends [ResponseEntityExceptionHandler] so Spring MVC's own exceptions (missing header,
+ * malformed body, unsupported method or media type) keep their 4xx status instead of
+ * falling through to the catch-all 500 handler below.
  */
 @RestControllerAdvice
-class ApiExceptionHandler {
+class ApiExceptionHandler : ResponseEntityExceptionHandler() {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -42,15 +51,20 @@ class ApiExceptionHandler {
             problem(HttpStatus.CONFLICT, "idempotency-conflict", error)
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException::class)
-    fun handleValidation(e: MethodArgumentNotValidException): ProblemDetail {
-        val detail = e.bindingResult.fieldErrors.joinToString("; ") {
+    override fun handleMethodArgumentNotValid(
+        ex: MethodArgumentNotValidException,
+        headers: HttpHeaders,
+        status: HttpStatusCode,
+        request: WebRequest,
+    ): ResponseEntity<Any>? {
+        val detail = ex.bindingResult.fieldErrors.joinToString("; ") {
             "${it.field}: ${it.defaultMessage}"
         }
-        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail).apply {
+        val body = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail).apply {
             type = URI.create("https://ledger.danilocordeiro.dev/errors/validation")
             title = "Invalid request"
         }
+        return handleExceptionInternal(ex, body, headers, HttpStatus.BAD_REQUEST, request)
     }
 
     @ExceptionHandler(IllegalArgumentException::class)
