@@ -7,6 +7,7 @@ import dev.danilocordeiro.ledger.application.port.output.ClockPort
 import dev.danilocordeiro.ledger.application.port.output.IdempotencyRecord
 import dev.danilocordeiro.ledger.application.port.output.IdempotencyRepository
 import dev.danilocordeiro.ledger.application.port.output.LedgerRepository
+import dev.danilocordeiro.ledger.application.port.output.OutboxEvent
 import dev.danilocordeiro.ledger.application.port.output.OutboxRepository
 import dev.danilocordeiro.ledger.application.port.output.UnitOfWork
 import dev.danilocordeiro.ledger.application.service.PostTransactionService
@@ -19,16 +20,20 @@ import dev.danilocordeiro.ledger.domain.DomainError
 import dev.danilocordeiro.ledger.domain.Money
 import dev.danilocordeiro.ledger.domain.NormalSide
 import dev.danilocordeiro.ledger.domain.TransactionId
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
  * Pure unit tests: no Spring context, no database. This is only possible because the
@@ -140,6 +145,35 @@ class PostTransactionServiceTest {
         every { idempotency.find(any()) } returns null
 
         assertThrows<DomainError.CurrencyMismatch> { service.post(transferCommand(amount = 1_000)) }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["a\"b\\c\nd\",\"currency\":\"XXX", "pedido-ção-日本-😀", "\u0000\t\u2028"])
+    fun `outbox payload keeps a hostile or unicode external reference as an exact string value`(ref: String) {
+        val payload = ObjectMapper().readTree(postedPayload(ref))
+
+        assertEquals(ref, payload.get("externalReference").textValue())
+        assertEquals("BRL", payload.get("currency").textValue())
+        assertEquals(eventFields, payload.fieldNames().asSequence().toSet())
+    }
+
+    @Test
+    fun `outbox payload renders a missing external reference as json null`() {
+        val payload = ObjectMapper().readTree(postedPayload(null))
+        assertTrue(payload.get("externalReference").isNull)
+        assertEquals(eventFields, payload.fieldNames().asSequence().toSet())
+    }
+
+    private val eventFields = setOf("transactionId", "currency", "occurredAt", "externalReference", "entries")
+
+    private fun postedPayload(externalReference: String?): String {
+        givenAccounts(sourceAllowsNegative = true)
+        every { idempotency.find(any()) } returns null
+        every { ledger.lockAndLoadBalances(any()) } returns emptyMap()
+        val events = mutableListOf<OutboxEvent>()
+        every { outbox.append(capture(events)) } returns Unit
+        service.post(transferCommand(amount = 1_000).copy(externalReference = externalReference))
+        return events.single().payloadJson
     }
 
     private fun givenAccounts(sourceAllowsNegative: Boolean, currency: CurrencyCode = brl) {
